@@ -13,6 +13,7 @@ class TestCannyFilter(unittest.TestCase):
         plt.imsave('./tests/outputs/gaussian_filtered_image.png', img, cmap=plt.get_cmap('gray'))
         self.ih.img = img
 
+    @unittest.skip("Takes longer time")
     def test_sobel_filter(self):
 
         img, direc = sobel_filter(self.ih.img)
@@ -20,5 +21,10 @@ class TestCannyFilter(unittest.TestCase):
 
         plt.imsave('./tests/outputs/sobel_filtered_image.png', img, cmap=plt.get_cmap('gray'))
         plt.imsave('./tests/outputs/sobel_filtered_direction.png', direc, cmap=plt.get_cmap('gray')) 
+    
+    def test_non_max_suppression(self):
+        
+        img, direc = sobel_filter(self.ih.img) 
+        m,n = direc.shape
 
     

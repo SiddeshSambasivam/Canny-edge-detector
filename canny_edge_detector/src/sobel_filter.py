@@ -7,7 +7,7 @@ def sobel_kernels() -> List[np.ndarray]:
     
     return Gx, Gy
 
-def sobel_filter(img: np.ndarray) -> List[np.ndarray]:
+def sobel_filter(img: np.ndarray, degree:bool=True) -> List[np.ndarray]:
 
     Gx, Gy = sobel_kernels()
     m,n = img.shape
@@ -22,4 +22,7 @@ def sobel_filter(img: np.ndarray) -> List[np.ndarray]:
             grad_intensity[i+1][j+1] = np.sqrt(gx**2 + gy**2)
             grad_direction[i+1][j+1] = np.arctan2(gx, gy)
 
-    return grad_intensity, grad_intensity
+    if degree:
+        grad_direction = np.rad2deg(grad_direction)
+
+    return grad_intensity, grad_direction
