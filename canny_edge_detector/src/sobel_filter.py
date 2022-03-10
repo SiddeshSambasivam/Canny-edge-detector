@@ -1,28 +1,28 @@
 import numpy as np
 from typing import List
 
+from .ops import convolve
+
 def sobel_kernels() -> List[np.ndarray]:
-    Gy = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]], dtype=np.float32)
-    Gx = np.array([[1, 0, -1], [2, 0, -2], [1, 0, -1]], dtype=np.float32)
+    Gy = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=np.float32)
+    Gx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=np.float32)
     
     return Gx, Gy
 
-def sobel_filter(img: np.ndarray, degree:bool=True) -> List[np.ndarray]:
+def sobel_filter(img: np.ndarray, convert_to_deg:bool=False) -> List[np.ndarray]:
 
     Gx, Gy = sobel_kernels()
-    m,n = img.shape
-    grad_intensity = np.zeros((m,n))
-    grad_direction = np.zeros((m,n))
+    
+    gx = convolve(img, Gx, True)
+    gy = convolve(img, np.flip(Gx.T, axis=0), True)
 
-    # TODO: Implement padding
-    for i in range(m-2):
-        for j in range(n-2):
-            gx = np.sum(np.multiply(img[i:i+3, j:j+3], Gx))
-            gy = np.sum(np.multiply(img[i:i+3, j:j+3], Gy))
-            grad_intensity[i+1][j+1] = np.sqrt(gx**2 + gy**2)
-            grad_direction[i+1][j+1] = np.arctan2(gx, gy)
+    grad_intensity = np.sqrt(np.square(gx) + np.square(gy))
+    grad_intensity *= 255.0/grad_intensity.max()
 
-    if degree:
+    grad_direction = np.arctan2(gy, gx)
+
+    if convert_to_deg:
         grad_direction = np.rad2deg(grad_direction)
+        grad_direction += 180
 
     return grad_intensity, grad_direction
