@@ -16,10 +16,11 @@ The repository is a contains the implementation of canny edge detection algorith
 
 ## Installation
 
+### From source
 ```bash
-# From source
-
 >> git clone https://github.com/SiddeshSambasivam/Canny-edge-detector.git
+
+>> cd Canny-edge-detector 
 
 >> pip install .
 ```
