@@ -1,4 +1,13 @@
+import os
 import numpy as np
+import matplotlib.pyplot as plt
+import copy
+
+from .gaussian_filter import gaussian_filter
+from .sobel_filter import sobel_filter
+
+STRONG = 255
+WEAK = 50
 
 def non_max_suppression(mag_mat, dir_mat:np.ndarray) -> np.ndarray: 
     """Makes the edges thinner"""
@@ -29,9 +38,30 @@ def non_max_suppression(mag_mat, dir_mat:np.ndarray) -> np.ndarray:
     return out
 
 def thresholding(img:np.ndarray, low:float, high:float, verbose:bool=False) -> np.ndarray:
-    """Thresholding the image"""
-    strong = 255
-    weak = 50
+    """
+    Thresholding the image using the given low and high values.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        Image to be thresholded
+    low : float
+        Lower cutoff value
+    high : float
+        Higher cutoff value
+    strong : int, optional
+        Strong threshold value is set for pixel values greater than high. The default is 255.
+    weak : int, optional
+        Weak threshold value is set for pixel values in the [high, low]. The default is 50.
+    verbose : bool, optional
+        Whether to print the thresholding values. The default is False.
+    
+    Returns
+    -------
+    out : np.ndarray
+        The output of thresholding
+    
+    """
     m,n = img.shape
     out = np.zeros((m,n))
 
@@ -42,7 +72,105 @@ def thresholding(img:np.ndarray, low:float, high:float, verbose:bool=False) -> n
     strong_row, strong_col = np.where(img >= high)
     weak_row, weak_col = np.where((img <= high) & (img >= low))
  
-    out[strong_row, strong_col] = strong
-    out[weak_row, weak_col] = weak
+    out[strong_row, strong_col] = STRONG
+    out[weak_row, weak_col] = WEAK
 
+    return out
+
+def hysteresis(image:np.ndarray) -> np.ndarray:
+    """
+    Checks for hysteresis in the image and normalizes the output
+
+    NOTE: There are two cases that happens during hysteresis:
+    1. When traversing from left to right, weak pixels to the right are preserved but weak pixels to the left are discarded
+    2. When traversing from right to left, weak pixels to the left are preserved but weak pixels to the right are discarded
+
+    Therefore the output of both traversals are added together and then normalized to the range [0, 255].
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Image to be processed
+
+    Returns
+    -------
+    out : np.ndarray
+        The output of hysteresis    
+     
+    """
+    new_image = copy.deepcopy(image)
+    new_image_l = copy.deepcopy(image)
+    m,n = image.shape
+
+    # NOTE: This covers edges where stronger pixels are traversed first
+    for i in range(1, m):
+        for j in range(1, n):
+            if new_image[i][j] == WEAK:
+                if new_image[i-1][j-1] == STRONG or new_image[i-1][j] == STRONG \
+                    or new_image[i-1][j+1] == STRONG or new_image[i][j-1] == STRONG \
+                        or new_image[i][j+1] == STRONG or new_image[i+1][j-1] == STRONG \
+                            or new_image[i+1][j] == STRONG or new_image[i+1][j+1] == STRONG:
+                    new_image[i][j] = STRONG
+                else:
+                    new_image[i][j] = 0
+
+    # NOTE: 
+    for i in range(m-1, 0, -1):
+        for j in range(n-1, 0, -1):
+            if new_image_l[i][j] == WEAK:
+                if new_image_l[i-1][j-1] == STRONG or new_image_l[i-1][j] == STRONG \
+                    or new_image_l[i-1][j+1] == STRONG or new_image_l[i][j-1] == STRONG \
+                        or new_image_l[i][j+1] == STRONG or new_image_l[i+1][j-1] == STRONG \
+                            or new_image_l[i+1][j] == STRONG or new_image_l[i+1][j+1] == STRONG:
+                    new_image_l[i][j] = STRONG
+                else:
+                    new_image_l[i][j] = 0
+
+    out = new_image + new_image_l
+    out[out > 255] = 255
+
+    return out
+
+def canny(image:np.ndarray, low:float=10, high:float=30, verbose:bool=False, save_outputs:bool=False) -> np.ndarray:
+    """Canny edge detection is a technique for finding edges in an image.
+    Parameters
+    ----------
+    image : np.ndarray
+        Image to be processed
+    low : float, optional
+        Lower cutoff value. The default is 10.
+    high : float, optional
+        Higher cutoff value. The default is 30.
+    verbose : bool, optional
+        Whether to print the thresholding values. The default is False.
+    
+    Returns
+    -------
+    out : np.ndarray
+        The output of canny edge detection
+    
+    """
+
+    denoised_image = gaussian_filter(image) 
+    
+    
+    gradient_magnitude, gradient_direction = sobel_filter(denoised_image, verbose) 
+
+    suppr_image = non_max_suppression(gradient_magnitude, gradient_direction)
+    thers = thresholding(suppr_image, low, high, verbose)
+
+    out = hysteresis(thers)
+
+    if save_outputs:
+
+        # check if outputs folder exists
+        if not os.path.exists('./outputs'):
+            os.makedirs('./outputs')
+
+        plt.imsave('./outputs/1_gaussian_filtered.png', denoised_image, cmap=plt.get_cmap('gray'))
+        plt.imsave('./outputs/2_sobel_filtered.png', gradient_magnitude, cmap=plt.get_cmap('gray'))
+        plt.imsave('./outputs/3_non_max_suppression.png', suppr_image, cmap=plt.get_cmap('gray')) 
+        plt.imsave('./outputs/4_thresholding.png', thers, cmap=plt.get_cmap('gray')) 
+        plt.imsave('./outputs/5_hysteresis.png', out, cmap=plt.get_cmap('gray'))
+    
     return out
