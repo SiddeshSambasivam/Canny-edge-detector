@@ -77,6 +77,42 @@ def thresholding(img:np.ndarray, low:float, high:float, verbose:bool=False) -> n
 
     return out
 
+def blob_analysis(image:np.ndarray, outer_range:range, inner_range:range) -> np.ndarray:
+    """
+    Filters a weak edge pixel by looking at its 8-connected neighborhood pixels and decides if it should be strong or discarded.
+
+    Strong pixels are set to 255 and weak pixels are set to 0.
+
+    NOTE: This function is used in hysteresis to filter weak pixels. 
+
+    Parameters
+    ----------
+    image : np.ndarray
+        Image to be processed
+    outer_range : range
+        Range of outer indices
+    inner_range : range
+        Range of inner indices
+        
+    Returns
+    -------
+    out : np.ndarray
+        The output of blob filter
+    """
+
+    for i in outer_range:
+        for j in inner_range:
+            if image[i][j] == WEAK:
+                if image[i-1][j-1] == STRONG or image[i-1][j] == STRONG \
+                    or image[i-1][j+1] == STRONG or image[i][j-1] == STRONG \
+                        or image[i][j+1] == STRONG or image[i+1][j-1] == STRONG \
+                            or image[i+1][j] == STRONG or image[i+1][j+1] == STRONG:
+                    image[i][j] = STRONG
+                else:
+                    image[i][j] = 0    
+
+    return image
+
 def hysteresis(image:np.ndarray) -> np.ndarray:
     """
     Checks for hysteresis in the image and normalizes the output
@@ -98,35 +134,14 @@ def hysteresis(image:np.ndarray) -> np.ndarray:
         The output of hysteresis    
      
     """
-    new_image = copy.deepcopy(image)
-    new_image_l = copy.deepcopy(image)
+    image_right = copy.deepcopy(image)
+    image_left = copy.deepcopy(image)
     m,n = image.shape
 
-    # NOTE: This covers edges where stronger pixels are traversed first
-    for i in range(1, m):
-        for j in range(1, n):
-            if new_image[i][j] == WEAK:
-                if new_image[i-1][j-1] == STRONG or new_image[i-1][j] == STRONG \
-                    or new_image[i-1][j+1] == STRONG or new_image[i][j-1] == STRONG \
-                        or new_image[i][j+1] == STRONG or new_image[i+1][j-1] == STRONG \
-                            or new_image[i+1][j] == STRONG or new_image[i+1][j+1] == STRONG:
-                    new_image[i][j] = STRONG
-                else:
-                    new_image[i][j] = 0
+    image_right = blob_analysis(image_right, range(1, m), range(1, n))
+    image_left  = blob_analysis(image_left, range(m-1, 0, -1), range(n-1, 0, -1))
 
-    # NOTE: 
-    for i in range(m-1, 0, -1):
-        for j in range(n-1, 0, -1):
-            if new_image_l[i][j] == WEAK:
-                if new_image_l[i-1][j-1] == STRONG or new_image_l[i-1][j] == STRONG \
-                    or new_image_l[i-1][j+1] == STRONG or new_image_l[i][j-1] == STRONG \
-                        or new_image_l[i][j+1] == STRONG or new_image_l[i+1][j-1] == STRONG \
-                            or new_image_l[i+1][j] == STRONG or new_image_l[i+1][j+1] == STRONG:
-                    new_image_l[i][j] = STRONG
-                else:
-                    new_image_l[i][j] = 0
-
-    out = new_image + new_image_l
+    out = image_right + image_left
     out[out > 255] = 255
 
     return out
