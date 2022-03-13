@@ -28,14 +28,16 @@ def non_max_suppression(mag_mat, dir_mat:np.ndarray) -> np.ndarray:
     
     return out
 
-def thresholding(img:np.ndarray, low:float, high:float) -> np.ndarray:
+def thresholding(img:np.ndarray, low:float, high:float, verbose:bool=False) -> np.ndarray:
     """Thresholding the image"""
     strong = 255
     weak = 50
     m,n = img.shape
     out = np.zeros((m,n))
-    print('Max/min: ', img.max(), img.min())
-    print('Mean: ', img.mean())
+
+    if verbose:
+        print('\nMax/min: ', img.max(), img.min())
+        print('Mean: ', img.mean())
 
     strong_row, strong_col = np.where(img >= high)
     weak_row, weak_col = np.where((img <= high) & (img >= low))

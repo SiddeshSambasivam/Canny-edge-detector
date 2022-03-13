@@ -41,16 +41,18 @@ class TestCannyFilter(unittest.TestCase):
         plt.imsave('./tests/outputs/non_max_suppression.png', out, cmap=plt.get_cmap('gray')) 
 
     def test_double_threshold(self):
-        from scipy.ndimage import gaussian_filter
 
-        img = gaussian_filter(self.ih.img, 1.4) 
-        plt.imsave('./tests/outputs/gaussian_filtered_image.png', img, cmap=plt.get_cmap('gray'))
+        img = gaussian_filter(self.ih.img) 
+        plt.imsave('./tests/outputs/1_gaussian_filtered_image.png', img, cmap=plt.get_cmap('gray'))
+        
         img, direc = sobel_filter(img, True) 
-        plt.imsave('./tests/outputs/sobel_filtered_image.png', img, cmap=plt.get_cmap('gray'))
+        plt.imsave('./tests/outputs/2_sobel_filtered_image.png', img, cmap=plt.get_cmap('gray'))
+
         out = non_max_suppression(img, direc)
-        plt.imsave('./tests/outputs/non_max_suppression.png', out, cmap=plt.get_cmap('gray')) 
-        thers = thresholding(out, 5, 20)
-        plt.imsave('./tests/outputs/double_thresholding.png', thers, cmap=plt.get_cmap('gray')) 
+        plt.imsave('./tests/outputs/3_non_max_suppression.png', out, cmap=plt.get_cmap('gray')) 
+
+        thers = thresholding(out, 5, 20, True)
+        plt.imsave('./tests/outputs/4_double_thresholding.png', thers, cmap=plt.get_cmap('gray')) 
 
 
     

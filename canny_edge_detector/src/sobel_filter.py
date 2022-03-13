@@ -14,7 +14,7 @@ def sobel_filter(img: np.ndarray, convert_to_deg:bool=False) -> List[np.ndarray]
     Gx, Gy = sobel_kernels()
     
     gx = convolve(img, Gx, True)
-    gy = convolve(img, np.flip(Gx.T, axis=0), True)
+    gy = convolve(img, Gy, True)
 
     grad_intensity = np.sqrt(np.square(gx) + np.square(gy))
     grad_intensity *= 255.0/grad_intensity.max()
