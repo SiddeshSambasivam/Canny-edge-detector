@@ -32,6 +32,7 @@ def non_max_suppression(mag_mat, dir_mat:np.ndarray) -> np.ndarray:
                 pos = mag_mat[i-1][j+1]
                 neg = mag_mat[i+1][j-1]
             
+            
             if mag_mat[i][j] >= pos and mag_mat[i][j] >= neg:
                 out[i][j] = mag_mat[i][j]
     
