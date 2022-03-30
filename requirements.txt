@@ -1,7 +1,7 @@
 attrs==21.4.0
 iniconfig==1.1.1
-numpy @ file:///Users/runner/miniforge3/conda-bld/numpy_1643958859645/work
-opencv-python==4.5.5
+numpy 
+opencv-python
 packaging==21.3
 pluggy==1.0.0
 py==1.11.0
