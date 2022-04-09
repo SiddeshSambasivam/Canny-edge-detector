@@ -1,7 +1,14 @@
 import numpy as np
-from typing import List
+from typing import List, NamedTuple, Type
 
 from .ops import convolve
+
+class Gradient(NamedTuple):
+    """Gradient of an image"""
+    intensity: np.ndarray
+    direction: np.ndarray
+    gx: np.ndarray
+    gy: np.ndarray
 
 def sobel_kernels() -> List[np.ndarray]:
     Gy = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=np.float32)
@@ -9,7 +16,7 @@ def sobel_kernels() -> List[np.ndarray]:
     
     return Gx, Gy
 
-def sobel_filter(img: np.ndarray, convert_to_deg:bool=False) -> List[np.ndarray]:
+def sobel_filter(img: np.ndarray, convert_to_deg:bool=False) -> Type[Gradient]:
 
     Gx, Gy = sobel_kernels()
     
@@ -24,5 +31,7 @@ def sobel_filter(img: np.ndarray, convert_to_deg:bool=False) -> List[np.ndarray]
     if convert_to_deg:
         grad_direction = np.rad2deg(grad_direction)
         grad_direction += 180
+    
+    output = Gradient(grad_intensity, grad_direction, gx, gy)
 
-    return grad_intensity, grad_direction
+    return output

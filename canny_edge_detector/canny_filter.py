@@ -1,38 +1,66 @@
 import os
+import logging
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
 
 from .gaussian_filter import gaussian_filter
-from .sobel_filter import sobel_filter
+from .sobel_filter import sobel_filter, Gradient, Type
 
 STRONG = 255
 WEAK = 50
 
-def non_max_suppression(mag_mat, dir_mat:np.ndarray) -> np.ndarray: 
+logger = logging.getLogger(__name__)
+
+def non_max_suppression(gradient: Type[Gradient], subpixel_correction:bool=False) -> np.ndarray: 
     """Makes the edges thinner"""
+
+    mag_mat = gradient.intensity
+    dir_mat = gradient.direction
 
     m,n = dir_mat.shape
     out = np.zeros((m,n))
 
+    def no_interpolation(i,j):
+        ang = dir_mat[i][j]
+        if (0 <= ang  < 22.5) or (337.5 <= ang <= 360) or (157.5 <= ang <= 202.5):
+            pos = mag_mat[i][j+1]
+            neg = mag_mat[i][j-1]
+        elif (67.5 <= ang < 112.5) or (247.5 <= ang < 292.5):
+            pos = mag_mat[i-1][j]
+            neg = mag_mat[i+1][j]
+        elif (112.5 <= ang < 157.5) or (292.5 <= ang < 337.5):
+            pos = mag_mat[i-1][j-1]
+            neg = mag_mat[i+1][j+1]
+        else:
+            # NOTE: This corresponds to this case = (22.5 <= ang < 67.5) or (202.5 <= ang < 247.5)
+            pos = mag_mat[i-1][j+1]
+            neg = mag_mat[i+1][j-1]
+        return pos, neg
+
+    def interpolation(i,j):
+        ang = dir_mat[i][j]
+        if (0 <= ang  < 22.5) or (337.5 <= ang <= 360) or (157.5 <= ang <= 202.5):
+            pos = mag_mat[i][j+1] + (mag_mat[i][j+1] - mag_mat[i][j-1]) * gradient.gy[i][j] / gradient.intensity[i][j]
+            neg = mag_mat[i][j-1] + (mag_mat[i][j-1] - mag_mat[i][j+1]) * gradient.gy[i][j] / gradient.intensity[i][j]
+        elif (67.5 <= ang < 112.5) or (247.5 <= ang < 292.5):
+            pos = mag_mat[i-1][j] + (mag_mat[i-1][j] - mag_mat[i+1][j]) * gradient.gx[i][j] / gradient.intensity[i][j]
+            neg = mag_mat[i+1][j] + (mag_mat[i+1][j] - mag_mat[i-1][j]) * gradient.gx[i][j] / gradient.intensity[i][j]
+        elif (112.5 <= ang < 157.5) or (292.5 <= ang < 337.5):
+            pos = mag_mat[i-1][j-1] + (mag_mat[i-1][j-1] - mag_mat[i+1][j+1]) * gradient.gx[i][j] / gradient.intensity[i][j]
+            neg = mag_mat[i+1][j+1] + (mag_mat[i+1][j+1] - mag_mat[i-1][j-1]) * gradient.gx[i][j] / gradient.intensity[i][j]
+        else:
+            # NOTE: This corresponds to this case = (22.5 <= ang < 67.5) or (202.5 <= ang < 247.5)
+            pos = mag_mat[i-1][j+1] + (mag_mat[i-1][j+1] - mag_mat[i+1][j-1]) * gradient.gx[i][j] / gradient.intensity[i][j]
+            neg = mag_mat[i+1][j-1] + (mag_mat[i+1][j-1] - mag_mat[i-1][j+1]) * gradient.gx[i][j] / gradient.intensity[i][j]
+        return pos, neg
+
     for i in range(1, m-1):
         for j in range(1, n-1):
-            ang = dir_mat[i][j]
-            if (0 <= ang  < 22.5) or (337.5 <= ang <= 360) or (157.5 <= ang <= 202.5):
-                pos = mag_mat[i][j+1]
-                neg = mag_mat[i][j-1]
-            elif (67.5 <= ang < 112.5) or (247.5 <= ang < 292.5):
-                pos = mag_mat[i-1][j]
-                neg = mag_mat[i+1][j]
-            elif (112.5 <= ang < 157.5) or (292.5 <= ang < 337.5):
-                pos = mag_mat[i-1][j-1]
-                neg = mag_mat[i+1][j+1]
-            else:
-                # NOTE: This corresponds to this case = (22.5 <= ang < 67.5) or (202.5 <= ang < 247.5)
-                pos = mag_mat[i-1][j+1]
-                neg = mag_mat[i+1][j-1]
-            
-            
+
+            pos, neg = interpolation(i,j) if subpixel_correction else no_interpolation(i,j)
+
             if mag_mat[i][j] >= pos and mag_mat[i][j] >= neg:
                 out[i][j] = mag_mat[i][j]
     
@@ -67,8 +95,8 @@ def thresholding(img:np.ndarray, low:float, high:float, verbose:bool=False) -> n
     out = np.zeros((m,n))
 
     if verbose:
-        print('\nMax/min: ', img.max(), img.min())
-        print('Mean: ', img.mean())
+        logger.info(f'\nMax/min: {img.max()} {img.min()}')
+        logger.info(f'Mean: {img.mean()}')
 
     strong_row, strong_col = np.where(img >= high)
     weak_row, weak_col = np.where((img <= high) & (img >= low))
@@ -147,7 +175,10 @@ def hysteresis(image:np.ndarray) -> np.ndarray:
 
     return out
 
-def canny(image:np.ndarray, low:float=10, high:float=30, verbose:bool=False, save_outputs:bool=False) -> np.ndarray:
+def canny(image:np.ndarray, 
+    low:float=10, high:float=30, 
+    subpixel_correction:bool=False, verbose:bool=False, 
+    save_outputs:bool=False) -> np.ndarray:
     """Canny edge detection is a technique for finding edges in an image.
     Parameters
     ----------
@@ -170,23 +201,24 @@ def canny(image:np.ndarray, low:float=10, high:float=30, verbose:bool=False, sav
     denoised_image = gaussian_filter(image) 
     
     
-    gradient_magnitude, gradient_direction = sobel_filter(denoised_image, verbose) 
+    gradient = sobel_filter(denoised_image, verbose) 
 
-    suppr_image = non_max_suppression(gradient_magnitude, gradient_direction)
+    suppr_image = non_max_suppression(gradient, subpixel_correction)
     thers = thresholding(suppr_image, low, high, verbose)
 
     out = hysteresis(thers)
 
     if save_outputs:
 
-        # check if outputs folder exists
         if not os.path.exists('./outputs'):
             os.makedirs('./outputs')
 
         plt.imsave('./outputs/1_gaussian_filtered.png', denoised_image, cmap=plt.get_cmap('gray'))
-        plt.imsave('./outputs/2_sobel_filtered.png', gradient_magnitude, cmap=plt.get_cmap('gray'))
+        plt.imsave('./outputs/2_sobel_filtered.png', gradient.intensity, cmap=plt.get_cmap('gray'))
         plt.imsave('./outputs/3_non_max_suppression.png', suppr_image, cmap=plt.get_cmap('gray')) 
         plt.imsave('./outputs/4_thresholding.png', thers, cmap=plt.get_cmap('gray')) 
-        plt.imsave('./outputs/5_hysteresis.png', out, cmap=plt.get_cmap('gray'))
-    
+        if subpixel_correction:
+            plt.imsave('./outputs/5_hysteresis_sub.png', out, cmap=plt.get_cmap('gray'))
+        else:
+            plt.imsave('./outputs/5_hysteresis.png', out, cmap=plt.get_cmap('gray'))
     return out
